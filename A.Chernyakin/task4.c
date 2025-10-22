@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <termios.h>
+#include <unistd.h>
 
 #define BUFFER_SIZE 256
 
@@ -10,112 +11,106 @@ typedef struct Node_s {
     struct Node_s *next;
 } Node;
 
-Node *head = NULL; // Убираем глобальные переменные, инициализируем в main
+Node *head = NULL;
 Node *tail = NULL;
 
-// Функция для добавления строки в конец списка
+void init() {
+    head = NULL;
+    tail = NULL;
+}
+
 void push(char *string) {
-    unsigned long len = strlen(string) + 1;
-    char *copyPtr = malloc(len); // Используем malloc, как в задании
-    if (!copyPtr) {
-        fprintf(stderr, "Memory allocation failed\n");
+    size_t len = strlen(string) + 1;
+    char *copy = malloc(len);
+    if (!copy) {
+        perror("malloc");
         exit(1);
     }
-    strcpy(copyPtr, string);
+    strcpy(copy, string);
 
     Node *newNode = malloc(sizeof(Node));
     if (!newNode) {
-        free(copyPtr);
-        fprintf(stderr, "Memory allocation failed\n");
+        perror("malloc");
+        free(copy);
         exit(1);
     }
-
-    newNode->string = copyPtr;
+    newNode->string = copy;
     newNode->next = NULL;
 
-    if (head == NULL) {
-        head = newNode;
-        tail = newNode;
+    if (!head) {
+        head = tail = newNode;
     } else {
         tail->next = newNode;
         tail = newNode;
     }
 }
 
-// Функция для вывода всех строк из списка
 void printList() {
-    Node *ptr = head;
-    while (ptr != NULL) {
-        printf("%s\n", ptr->string);
-        ptr = ptr->next;
+    Node *cur = head;
+    while (cur) {
+        // Выводим строку как есть (включая escape-последовательности)
+        printf("%s\n", cur->string);
+        cur = cur->next;
     }
 }
 
-// Освобождение памяти списка
 void freeList() {
-    Node *current = head;
-    while (current != NULL) {
-        Node *next = current->next;
-        free(current->string);
-        free(current);
-        current = next;
+    Node *cur = head;
+    while (cur) {
+        Node *next = cur->next;
+        free(cur->string);
+        free(cur);
+        cur = next;
     }
     head = tail = NULL;
 }
 
+// Управление raw-режимом
+void setRawMode(int enable) {
+    static struct termios orig_termios;
+    static int is_saved = 0;
+
+    if (enable) {
+        if (!is_saved) {
+            if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) return;
+            is_saved = 1;
+        }
+        struct termios raw = orig_termios;
+        raw.c_lflag &= ~(ICANON | ECHO);
+        raw.c_cc[VMIN] = 1;
+        raw.c_cc[VTIME] = 0;
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    } else {
+        if (is_saved) {
+            tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+            is_saved = 0;
+        }
+    }
+}
+
+// Безопасная печать строки (для отладки: показывает непечатаемые символы)
+void debugPrint(const char *s) {
+    while (*s) {
+        if (*s == '\x1b') {
+            printf("\\x1b");
+        } else if (*s == '\n') {
+            printf("\\n");
+        } else if (*s == '\r') {
+            printf("\\r");
+        } else if (*s == '\t') {
+            printf("\\t");
+        } else if (*s >= 32 && *s <= 126) {
+            putchar(*s);
+        } else {
+            printf("\\x%02x", (unsigned char)*s);
+        }
+        s++;
+    }
+    putchar('\n');
+}
+
 int main() {
     char inputBuf[BUFFER_SIZE];
+    init();
 
-    printf("Enter strings (letters and spaces only). Enter '.' to print results.\n");
-
-    while (1) {
-        printf("Enter string: ");
-        fflush(stdout);
-
-        // Читаем строку с помощью fgets
-        if (fgets(inputBuf, BUFFER_SIZE, stdin) == NULL) {
-            printf("\nInput ended (EOF).\n");
-            break;
-        }
-
-        // Удаляем символ новой строки, если он есть
-        size_t len = strlen(inputBuf);
-        if (len > 0 && inputBuf[len - 1] == '\n') {
-            inputBuf[len - 1] = '\0';
-            len--;
-        }
-
-        // Проверяем, является ли строка точкой (начинается с '.')
-        if (len == 1 && inputBuf[0] == '.') {
-            printf("Result:\n");
-            printList();
-            break;
-        }
-
-        // Проверка на пустую строку
-        if (len == 0) {
-            printf("Empty string not added.\n");
-            continue;
-        }
-
-        // Проверка на допустимые символы (только буквы и пробелы)
-        int valid = 1;
-        for (size_t i = 0; i < len; i++) {
-            if (!(isalpha(inputBuf[i]) || inputBuf[i] == ' ')) {
-                valid = 0;
-                break;
-            }
-        }
-
-        if (!valid) {
-            printf("Invalid characters detected. Only letters and spaces allowed.\n");
-            continue;
-        }
-
-        // Добавляем строку в список
-        push(inputBuf);
-    }
-
-    freeList(); // Освобождаем память
-    return 0;
-}
+    printf("Enter strings.
