@@ -113,4 +113,85 @@ int main() {
     char inputBuf[BUFFER_SIZE];
     init();
 
-    printf("Enter strings.
+    printf("Enter strings. Press '.' on its own line to finish.\n");
+
+    while (1) {
+        printf("Enter string: ");
+        fflush(stdout);
+
+        setRawMode(1);
+        int pos = 0;
+        unsigned char c;
+
+        while (pos < BUFFER_SIZE - 1) {
+            if (read(STDIN_FILENO, &c, 1) != 1) continue;
+
+            // Обработка завершения строки
+            if (c == '\n' || c == '\r') {
+                printf("\n");
+                break;
+            }
+
+            // Обработка Ctrl+C
+            if (c == 3) {
+                setRawMode(0);
+                printf("\n^C\n");
+                freeList();
+                return 0;
+            }
+
+            // Обработка Ctrl+D (EOF)
+            if (c == 4) {
+                setRawMode(0);
+                printf("\n^D\n");
+                freeList();
+                return 0;
+            }
+
+            // Backspace
+            if (c == 127 || c == 8) {
+                if (pos > 0) {
+                    pos--;
+                    printf("\b \b");
+                    fflush(stdout);
+                }
+                continue;
+            }
+
+            // Обычный символ (включая ESC, '[' и т.д.)
+            inputBuf[pos++] = c;
+            // Эхо: печатаем символ, даже если он управляющий
+            if (c == '\x1b') {
+                printf("\\x1b");
+            } else if (c >= 32 && c <= 126) {
+                putchar(c);
+            } else {
+                // Для непечатаемых — можно показать hex или просто не эхить
+                // Но лучше эхить как есть, иначе пользователь не видит ввод
+                // Однако терминал сам не эхит стрелки, поэтому мы тоже не будем
+                // (иначе будет мусор вроде [A на экране)
+                // Поэтому: не печатаем управляющие символы, кроме печатаемых
+            }
+            fflush(stdout);
+        }
+
+        setRawMode(0);
+        inputBuf[pos] = '\0';
+
+        // Проверка: если строка — это ровно "."
+        if (pos == 1 && inputBuf[0] == '.') {
+            printf("Result:\n");
+            printList();
+            break;
+        }
+
+        if (pos == 0) {
+            printf("Empty string not added.\n");
+        } else {
+            push(inputBuf);
+        }
+    }
+
+    freeList();
+    return 0;
+}
