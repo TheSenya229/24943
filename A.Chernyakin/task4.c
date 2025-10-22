@@ -113,7 +113,7 @@ int main() {
     char inputBuf[BUFFER_SIZE];
     init();
 
-    printf("Enter strings. Press '.' on its own line to finish.\n");
+    printf("Press '.' to finish.\n");
 
     while (1) {
         printf("Enter string: ");
