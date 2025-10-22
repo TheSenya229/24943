@@ -66,7 +66,7 @@ void freeList() {
 int main() {
     char inputBuf[BUFFER_SIZE];
 
-    printf("Enter strings (letters and spaces only). Enter '.' to print results.\n");
+    printf("Enter '.' to print results.\n");
 
     while (1) {
         printf("Enter string: ");
@@ -99,18 +99,7 @@ int main() {
         }
 
         // Проверка на допустимые символы (только буквы и пробелы)
-        int valid = 1;
-        for (size_t i = 0; i < len; i++) {
-            if (!(isalpha(inputBuf[i]) || inputBuf[i] == ' ')) {
-                valid = 0;
-                break;
-            }
-        }
-
-        if (!valid) {
-            printf("Invalid characters detected. Only letters and spaces allowed.\n");
-            continue;
-        }
+    
 
         // Добавляем строку в список
         push(inputBuf);
