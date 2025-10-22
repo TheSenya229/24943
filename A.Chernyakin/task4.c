@@ -26,7 +26,6 @@ void push(char *string) {
     Node *newNode = malloc(sizeof(Node));
     if (!newNode) {
         free(copyPtr);
-        fprintf(stderr, "Memory allocation failed\n");
         exit(1);
     }
 
