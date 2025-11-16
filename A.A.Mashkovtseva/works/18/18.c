@@ -26,12 +26,10 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        int common = 0;
         if (S_ISDIR(file_st.st_mode)) {
             printf("d");
         } else if (S_ISREG(file_st.st_mode)) {
             printf("-");
-            common = 1;
         } else {
             printf("?");
         }
@@ -55,7 +53,7 @@ int main(int argc, char *argv[]) {
         if (group) printf("%-8s ", group->gr_name);
         else printf("%-8u", file_st.st_gid);
 
-        common ? printf(" %5lld ", (long long)file_st.st_size) : printf("       ");
+        printf(" %5lld ", (long long)file_st.st_size);
 
         struct tm *mt = localtime(&file_st.st_mtime);
         printf("%s %02d %02d:%02d ",
