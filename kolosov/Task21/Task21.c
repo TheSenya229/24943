@@ -6,6 +6,7 @@ int count = 0;
 
 void sigint_handler(int signo){
     (void)signo;
+    signal(SIGINT, sigint_handler);
     count++;
     write(1, "\a", 1);
 }
