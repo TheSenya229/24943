@@ -21,7 +21,6 @@ void display_uids(const char *phase) {
 }
 
 int try_access_file(const char *filepath) {
-    // Проверим, что файл существует и это обычный файл
     struct stat file_info;
     if (stat(filepath, &file_info) != 0) {
         perror("stat (file check)");

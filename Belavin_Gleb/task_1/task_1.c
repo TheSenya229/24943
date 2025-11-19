@@ -108,7 +108,20 @@ OptionResult handle_p(void) {
     return OPT_SUCCESS;
 }
 
-OptionResult handle_core_limit_info(void) {
+OptionResult handle_u(void) {
+    struct rlimit rl;
+    
+    // В Solaris используем RLIMIT_NOFILE вместо RLIMIT_NPROC
+    if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+        perror("getrlimit");
+        return OPT_ERROR_INVALID_VALUE;
+    }
+    
+    printf("Maximum number of open files (ulimit -n): %ld\n", (long)rl.rlim_cur);
+    return OPT_SUCCESS;
+}
+
+OptionResult handle_c(void) {
     struct rlimit rl;
     
     if (getrlimit(RLIMIT_CORE, &rl) != 0) {
@@ -116,11 +129,32 @@ OptionResult handle_core_limit_info(void) {
         return OPT_ERROR_INVALID_VALUE;
     }
     
-    printf("Core file size limit: %ld bytes\n", (long)rl.rlim_cur);
+    printf("Core file size: %ld bytes\n", (long)rl.rlim_cur);
     return OPT_SUCCESS;
 }
 
-OptionResult handle_set_core_limit(const char *arg) {
+OptionResult handle_U(const char *arg) {
+    if (!arg) {return OPT_ERROR_MISSING_ARGUMENT;}
+    
+    long size = safe_strtol(arg, "ulimit option");
+    if (size < 0) { return (OptionResult)size;}
+    
+    struct rlimit rl = {
+        .rlim_cur = (rlim_t)size,
+        .rlim_max = (rlim_t)size
+    };
+    
+    // В Solaris изменяем лимит открытых файлов
+    if (setrlimit(RLIMIT_NOFILE, &rl) == -1) {
+        perror("setrlimit");
+        return OPT_ERROR_INVALID_VALUE;
+    }
+    
+    printf("Maximum open files set to %ld\n", size);
+    return OPT_SUCCESS;
+}
+
+OptionResult handle_C(const char *arg) {
     if (!arg) {return OPT_ERROR_MISSING_ARGUMENT;}
     
     long size = safe_strtol(arg, "core limit option");
@@ -203,7 +237,7 @@ int main(int argc, char *argv[]) {
     }
 
     int opt;
-    while ((opt = getopt(argc, argv, "ispudcC:U:vV:")) != -1) {
+    while ((opt = getopt(argc, argv, "ispucC:U:d:vV:")) != -1) {
         if (opt_count >= opt_capacity) {
             opt_capacity *= 2;
             Option *tmp = realloc(opts, opt_capacity * sizeof(Option));
@@ -238,14 +272,20 @@ int main(int argc, char *argv[]) {
                 option_name = "-p";
                 break;
             case 'u': 
+                result = handle_u(); 
+                option_name = "-u";
+                break;
             case 'c': 
-                result = handle_core_limit_info(); 
-                option_name = (opts[i].opt == 'u') ? "-u" : "-c";
+                result = handle_c(); 
+                option_name = "-c";
                 break;
             case 'U': 
+                result = handle_U(opts[i].arg); 
+                option_name = "-U";
+                break;
             case 'C': 
-                result = handle_set_core_limit(opts[i].arg); 
-                option_name = (opts[i].opt == 'U') ? "-U" : "-C";
+                result = handle_C(opts[i].arg); 
+                option_name = "-C";
                 break;
             case 'd': 
                 result = handle_d(); 
