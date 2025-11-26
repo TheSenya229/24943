@@ -27,11 +27,9 @@ void check_line_wrap(int fd, char *buffer, int *pos, int *column) {
         return; 
     }
     
-
     int wrap_pos = *pos - 1;
     int found_space = -1;
     
-
     while (wrap_pos >= 0 && (*pos - wrap_pos) <= MAX_LINE) {
         if (isspace(buffer[wrap_pos])) {
             found_space = wrap_pos;
@@ -41,43 +39,30 @@ void check_line_wrap(int fd, char *buffer, int *pos, int *column) {
     }
     
     if (found_space != -1) {
- 
-        int new_line_start = found_space; 
+        int new_line_start = found_space + 1;
         int chars_to_move = *pos - new_line_start;
         
-
-        write(fd, "\n", 1);
-        
-      
-        for (int i = 0; i < chars_to_move; i++) {
-            write(fd, &buffer[new_line_start + i], 1);
+        if (chars_to_move > 0) {
+            for (int i = 0; i < chars_to_move + 1; i++) {
+                write(fd, "\b \b", 3);
+            }
+            
+            write(fd, "\n", 1);
+            
+            for (int i = 0; i < chars_to_move; i++) {
+                write(fd, &buffer[new_line_start + i], 1);
+            }
+            
+            for (int i = 0; i < chars_to_move; i++) {
+                buffer[i] = buffer[new_line_start + i];
+            }
+            
+            *pos = chars_to_move;
+            *column = chars_to_move;
         }
-        
-
-        for (int i = 0; i < chars_to_move; i++) {
-            buffer[i] = buffer[new_line_start + i];
-        }
-        
-
-        *pos = chars_to_move;
-        *column = chars_to_move;
     } else {
-     
-        int new_line_start = *pos - MAX_LINE;
-        int chars_to_move = *pos - new_line_start;
-        
         write(fd, "\n", 1);
-        
-        for (int i = 0; i < chars_to_move; i++) {
-            write(fd, &buffer[new_line_start + i], 1);
-        }
-        
-        for (int i = 0; i < chars_to_move; i++) {
-            buffer[i] = buffer[new_line_start + i];
-        }
-        
-        *pos = chars_to_move;
-        *column = chars_to_move;
+        *column = 0;
     }
 }
 
@@ -95,9 +80,9 @@ int main() {
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     
     unsigned char key_erase = oldt.c_cc[VERASE];      
-    unsigned char key_kill = oldt.c_cc[VKILL];      
-    unsigned char key_eof = oldt.c_cc[VEOF];          
-    unsigned char key_werase = oldt.c_cc[VWERASE];    
+    unsigned char key_kill = oldt.c_cc[VKILL];
+    unsigned char key_eof = oldt.c_cc[VEOF];
+    unsigned char key_werase = oldt.c_cc[VWERASE];
     
     char c;
     while (read(STDIN_FILENO, &c, 1) == 1) {
@@ -132,6 +117,8 @@ int main() {
         }
         else if (c == '\n' || c == '\r') {
             write(STDOUT_FILENO, &c, 1);
+            buffer[pos] = '\0';
+            printf("\nYou entered: %s\n", buffer);
             pos = 0;
             column = 0;
         }
@@ -140,7 +127,10 @@ int main() {
                 write(STDOUT_FILENO, &c, 1);
                 buffer[pos++] = c;
                 column++;
-                check_line_wrap(STDOUT_FILENO, buffer, &pos, &column);
+                
+                if (isspace(c) || column >= MAX_LINE) {
+                    check_line_wrap(STDOUT_FILENO, buffer, &pos, &column);
+                }
             } else {
                 write(STDOUT_FILENO, "\a", 1);
             }
