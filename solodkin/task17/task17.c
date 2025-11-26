@@ -45,7 +45,7 @@ void check_line_wrap(int fd, char *buffer, int *pos, int *column) {
         int new_line_start = found_space; 
         int chars_to_move = *pos - new_line_start;
         
-        // Перенос на новую строку
+
         write(fd, "\n", 1);
         
       
