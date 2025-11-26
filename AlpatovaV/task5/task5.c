@@ -67,7 +67,8 @@ int main(int argc, char ** argv){
     while (1){
         printf("\nEnter line number (1-%d, 0 to exit): ", mas.count);
         if (scanf("%d", &line_number) != 1) {
-            printf("invalid input\n");
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
             continue;
         }
         if (line_number == 0){

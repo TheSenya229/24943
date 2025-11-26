@@ -89,25 +89,56 @@ int main(int argc, char ** argv){
     int line_number;
     char buffer[256];
 
-    while (1){
-        printf("\nYou have 5 seconds to enter line number (1-%d, 0 to exit): ", mas.count);
-        fflush(stdout);
-        
-        alarm(5); 
-        
-        int result = scanf("%d", &line_number);
-        
-        alarm(0);
-
-        if (timeout) {
-            print_file(f);
-            break;
+    printf("\nYou have 5 seconds to enter line number (1-%d, 0 to exit): ", mas.count);
+    fflush(stdout);
+    
+    alarm(5); 
+    
+    int result = scanf("%d", &line_number);
+    
+    alarm(0);
+    if (timeout) {
+        print_file(f);
+    } else{
+        if (line_number == 0){
+            printf("Exit\n");
         }
+    
+        if (line_number < 1 || line_number > mas.count) {
+            printf("Line number must be between 1 and %d\n", mas.count);
+        } else{
+            Line *line_info = &mas.array[line_number - 1];
+        
+            if (lseek(f, line_info->offset, SEEK_SET) == -1) {
+                perror("Error seeking to line");
+            }else{
+                ssize_t bytes_read = read(f, buffer, line_info->len);
 
-        if (result != 1) {
+                buffer[bytes_read] = '\0';
+                printf("Line %d: %s\n", line_number, buffer);
+            }
+
+        }
+    }
+
+    if (result != 1) {
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF);
+    }
+
+
+
+
+    while (1 && !timeout && line_number != 0){
+        printf("\nEnter line number (1-%d, 0 to exit): ", mas.count);
+        if (scanf("%d", &line_number) != 1) {
             printf("invalid input\n");
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
             continue;
         }
+
+
         if (line_number == 0){
 	    printf("Exit\n");
 	    break;
@@ -117,7 +148,6 @@ int main(int argc, char ** argv){
             printf("Line number must be between 1 and %d\n", mas.count);
             continue;
         }
-
 
         Line *line_info = &mas.array[line_number - 1];
         
