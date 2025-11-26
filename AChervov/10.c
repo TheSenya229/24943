@@ -6,6 +6,10 @@
 
 int main(int argc, char const *argv[])
 {
+    if (argc < 2)
+    {
+        fprintf(stderr, "No args provided.\n");
+    }
     pid_t pid = fork();
     if (pid == -1)
     {

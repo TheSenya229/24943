@@ -16,7 +16,7 @@ int main(int argc, char const *argv[])
     
     if (argc < 2)
     {
-        fprintf(stderr, "Empty args.");
+        fprintf(stderr, "Empty args.\n");
     }
 
     for (int i = 1; i < argc; i++)
