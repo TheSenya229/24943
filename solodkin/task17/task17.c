@@ -8,25 +8,35 @@
 
 void erase_character(int fd, char *buffer, int *pos, int *column) {
     if (*pos > 0) {
-        write(fd, "\b \b", 3);
-        (*pos)--;
-        (*column)--;
-        
-        if (*column < 0 && *pos > 0) {
+        if (*column > 0) {
+            write(fd, "\b \b", 3);
+            (*pos)--;
+            (*column)--;
+        } else {
             int line_start = *pos;
             while (line_start > 0 && buffer[line_start - 1] != '\n') {
                 line_start--;
             }
             
-            int line_length = *pos - line_start;
-            *column = line_length;
-            
-            if (line_length > 0) {
+            if (line_start > 0) {
+                write(fd, "\b \b", 3);
+                (*pos)--;
+                
+                int prev_line_start = line_start - 1;
+                while (prev_line_start > 0 && buffer[prev_line_start - 1] != '\n') {
+                    prev_line_start--;
+                }
+                
+                int prev_line_end = line_start - 1;
+                int prev_line_length = prev_line_end - prev_line_start;
+                
+                *column = prev_line_length;
+                
                 write(fd, "\r", 1);
-                for (int i = line_start; i < *pos; i++) {
+                for (int i = prev_line_start; i < prev_line_end; i++) {
                     write(fd, &buffer[i], 1);
                 }
-                for (int i = 0; i < line_length; i++) {
+                for (int i = 0; i < prev_line_length; i++) {
                     write(fd, "\b", 1);
                 }
             }
@@ -131,8 +141,9 @@ int main() {
         }
         else if (c == '\n' || c == '\r') {
             write(STDOUT_FILENO, &c, 1);
+            buffer[pos++] = '\n';
             buffer[pos] = '\0';
-            printf("\nYou entered: %s\n", buffer);
+            printf("\nYou entered: %s", buffer);
             pos = 0;
             column = 0;
         }
