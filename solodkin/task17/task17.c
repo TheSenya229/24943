@@ -6,25 +6,46 @@
 
 #define MAX_LINE 40
 
-void erase_character(int fd, int *pos) {
+void erase_character(int fd, char *buffer, int *pos, int *column) {
     if (*pos > 0) {
         write(fd, "\b \b", 3);
         (*pos)--;
+        (*column)--;
+        
+        if (*column < 0 && *pos > 0) {
+            int line_start = *pos;
+            while (line_start > 0 && buffer[line_start - 1] != '\n') {
+                line_start--;
+            }
+            
+            int line_length = *pos - line_start;
+            *column = line_length;
+            
+            if (line_length > 0) {
+                write(fd, "\r", 1);
+                for (int i = line_start; i < *pos; i++) {
+                    write(fd, &buffer[i], 1);
+                }
+                for (int i = 0; i < line_length; i++) {
+                    write(fd, "\b", 1);
+                }
+            }
+        }
     }
 }
 
-void erase_word(int fd, char *buffer, int *pos) {
+void erase_word(int fd, char *buffer, int *pos, int *column) {
     while (*pos > 0 && isspace(buffer[*pos - 1])) {
-        erase_character(fd, pos);  
+        erase_character(fd, buffer, pos, column);
     }
     while (*pos > 0 && !isspace(buffer[*pos - 1])) {
-        erase_character(fd, pos);  
+        erase_character(fd, buffer, pos, column);
     }
 }
 
 void check_line_wrap(int fd, char *buffer, int *pos, int *column) {
     if (*column < MAX_LINE) {
-        return; 
+        return;
     }
     
     int wrap_pos = *pos - 1;
@@ -79,7 +100,7 @@ int main() {
     newt.c_cc[VTIME] = 0;
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     
-    unsigned char key_erase = oldt.c_cc[VERASE];      
+    unsigned char key_erase = oldt.c_cc[VERASE];
     unsigned char key_kill = oldt.c_cc[VKILL];
     unsigned char key_eof = oldt.c_cc[VEOF];
     unsigned char key_werase = oldt.c_cc[VWERASE];
@@ -89,28 +110,21 @@ int main() {
         if (c == key_eof && pos == 0) {
             break;
         }
-        else if (c == key_erase) {  
+        else if (c == key_erase) {
             if (pos > 0) {
-                erase_character(STDOUT_FILENO, &pos);  
-                column--;
+                erase_character(STDOUT_FILENO, buffer, &pos, &column);
             } else {
                 write(STDOUT_FILENO, "\a", 1);
             }
         }
         else if (c == key_kill) {
             while (pos > 0) {
-                erase_character(STDOUT_FILENO, &pos);
-                column--;
+                erase_character(STDOUT_FILENO, buffer, &pos, &column);
             }
         }
         else if (c == key_werase) {
             if (pos > 0) {
-                erase_word(STDOUT_FILENO, buffer, &pos);
-                column = 0;
-                for (int i = 0; i < pos; i++) {
-                    column++;
-                    if (buffer[i] == '\t') column += 7;
-                }
+                erase_word(STDOUT_FILENO, buffer, &pos, &column);
             } else {
                 write(STDOUT_FILENO, "\a", 1);
             }
