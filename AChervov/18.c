@@ -46,7 +46,12 @@ void print_ld(struct stat *s)
 {
     struct passwd *p = getpwuid(s->st_uid);
     struct group *g = getgrgid(s->st_gid);
+
     struct tm *tim = localtime(&s->st_mtim.tv_sec);
+    time_t clk = time(NULL);
+    struct tm *now = localtime(&clk);
+    int diff_year = tim->tm_year != now->tm_year ? 1 : 0;
+
     char time_f[40];
 
     printf("%c", S_ISDIR(s->st_mode) ? 'd' : '-');
@@ -57,6 +62,6 @@ void print_ld(struct stat *s)
     }
 
     printf(" %5ld %16s %16s %16ld", s->st_nlink, p->pw_name, g->gr_name, s->st_size);
-    strftime(time_f, 39, "%b %d %H:%M", tim);
+    strftime(time_f, 39, (diff_year ? "%Y %b %d %H:%M" : "%b %d %H:%M"), tim);
     printf(" %24s\n", time_f);
 }
