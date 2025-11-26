@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#define MNO 1
 
 long offsets[256];
 int lnlens[256];
@@ -36,35 +37,59 @@ int main(int argc, char *argv[])
     lnlens[lines] = lnlen;
     lines++;
 
+
     /* Debug */
     // for (int i = 0; i < lines; i++)
     // {
     //     printf("%ld %d\n", offsets[i], lnlens[i]);
     // }
-    
-    int input;
-    printf("Enter the line number [0-%d]: ", lines-1);
-    scanf("%d", &input);
 
-    if (input >= lines || input < 0)
+    printf("Argc %d\n", argc);
+    if (argc > 2 && !strcmp(argv[2], "-d"))
     {
-        fprintf(stderr, "Line index out of bounds.\n");
-        return -1;
+        for (size_t i = 0; i < lines; i++)
+        {
+            printf("Line #%ld, Offset=%ld, Length=%d\n", i+1, offsets[i], lnlens[i]);
+        }
+        exit(0);
     }
     
-
-    lseek(fd, offsets[input], SEEK_SET);
-
-    char buff[256];
-    int idx = 0;
-    while (read(fd, &(buff[idx]), 1) > 0 && buff[idx] != '\n')
+    int input = -1;
+    while (input)
     {
-        idx++;
-    }
-    buff[idx] = '\0';
-    // for (int i = 0; read(fd, &(buff[i]), 1) > 0 && buff[i] != '\n'; i++);
+        printf("Enter the line number [1-%d] (or 0 to exit): ", lines);
+        if (scanf("%d", &input) == 0)
+        {
+            fprintf(stderr, "Incorrect line input.\n");
+            while ((input = getchar()) != '\n' && input != EOF);
+            input = -1;
+            continue;
+        }
+        else if (input > lines || input < 0)
+        {
+            fprintf(stderr, "Line index out of bounds.\n");
+            continue;
+        }
+        else if (input == 0)
+        {
+            exit(0);
+        }
 
-    printf("%s\n", buff);
+        lseek(fd, offsets[input-1], SEEK_SET);
+
+        char buff[256];
+        int idx = 0;
+        while (read(fd, &(buff[idx]), 1) > 0 && buff[idx] != '\n')
+        {
+            idx++;
+        }
+        buff[idx] = '\0';
+        // for (int i = 0; read(fd, &(buff[i]), 1) > 0 && buff[i] != '\n'; i++);
+
+        printf("%s\n", buff);
+    }
+    
+    
     
     return 0;
 }
