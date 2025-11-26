@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/ttydefaults.h>
 #include <string.h>
 
 #define LINE_LENGTH 40
@@ -32,57 +31,53 @@ int main() {
         int len = strlen(line);
         if (iscntrl(c) || !isprint(c)) {
             switch (c) {
-                case CERASE: {
+                case 0x7F: {  // CERASE - Backspace/Delete
                     // Когда вводится символ ERASE, стирается
                     // последний символ в текущей строке.
-
-                    line[len - 1] = 0;
-
-                    // [D - Move cursor left one char
-                    // [K - Clear line from cursor right
-                    printf("\33[D\33[K");
-
+                    if (len > 0) {
+                        line[len - 1] = 0;
+                        // [D - Move cursor left one char
+                        // [K - Clear line from cursor right
+                        printf("\33[D\33[K");
+                    }
                     break;
                 }
 
-                case CKILL: {
+                case 0x15: {  // CKILL - Ctrl+U
                     // Когда вводится символ KILL, стираются
                     // все символы в текущей строке.
-
                     line[0] = 0;
-
                     // [2K - Clear entire line
                     printf("\33[2K\r");
-
                     break;
                 }
 
-                case CWERASE: {
+                case 0x17: {  // CWERASE - Ctrl+W
                     // Когда вводится CTRL-W, стирается последнее слово в текущей
                     // строке, вместе со всеми следующими за ним пробелами.
-
-                    int word_start = 0;
-                    char prev = ' ';
-                    for (int i = 0; i < len; i++) {
-                        if (line[i] != ' ' && prev == ' ') {
-                            word_start = i;
+                    if (len > 0) {
+                        int word_start = len;
+                        char prev = ' ';
+                        for (int i = len - 1; i >= 0; i--) {
+                            if (line[i] != ' ' && prev == ' ') {
+                                word_start = i;
+                            } else if (line[i] == ' ' && prev != ' ') {
+                                break;
+                            }
+                            prev = line[i];
                         }
-                        prev = line[i];
+
+                        line[word_start] = 0;
+                        // [<n>D - Move cursor left n chars
+                        // [K - Clear line from cursor right
+                        printf("\33[%dD\33[K", len - word_start);
                     }
-
-                    line[word_start] = 0;
-
-                    // [<n>D - Move cursor left n chars
-                    // [K - Clear line from cursor right
-                    printf("\33[%dD\33[K", len - word_start);
-
                     break;
                 }
 
-                case CEOF: {
+                case 0x04: {  // CEOF - Ctrl+D
                     // Программа завершается, когда введен CTRL-D
                     // и курсор находится в начале строки.
-
                     if (line[0] == 0) { exit(0); }
                     break;
                 }
