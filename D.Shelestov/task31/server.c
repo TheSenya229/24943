@@ -6,6 +6,8 @@
 #include <strings.h>
 #include <ctype.h>
 #include <poll.h>
+#include <time.h>
+#include <sys/time.h>
 
 #define BACKLOG (5)
 #define POLL_LENGTH (BACKLOG + 1)
@@ -17,6 +19,10 @@ char *socket_path = "./socket31";
 int main() {
     char buf[100];
     int fd, cl, rc;
+
+    // отсчет времени
+    struct timeval start_time;
+    gettimeofday(&start_time, NULL);
 
     if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket error");
@@ -42,18 +48,14 @@ int main() {
 
     struct pollfd poll_fds[POLL_LENGTH];
     for (int i = 0; i < POLL_LENGTH; i++) {
-        // fds with the negative value are ignored
         poll_fds[i].fd = -1;
         poll_fds[i].events = POLLIN | POLLPRI;
-
-        // POLLIN - Data other than high priority data may be read without blocking
-        // POLLPRI - High priority data may be read without blocking
     }
 
     poll_fds[0].fd = fd;
+    printf("Server started. Waiting for connections...\n");
 
     while (1) {
-        // If the value of timeout is -1, the poll blocks indefinitely
         if ((poll(poll_fds, POLL_LENGTH, -1)) == -1) {
             perror("bad poll");
             exit(-1);
@@ -63,24 +65,22 @@ int main() {
             if (poll_fds[i].fd < 0) continue;
             short revents = poll_fds[i].revents;
 
-            // POLLERR - An exceptional condition has occurred on the device or socket
-            // POLLHUP - The device or socket has been disconnected
-            // POLLNVAL - The file descriptor is not open
-
             if ((revents & POLLERR) || (revents & POLLHUP) || (revents & POLLNVAL)) {
-                close(poll_fds[i].fd);
-                poll_fds[i].fd = -1;
-
                 if (i == 0) {
                     printf("Server error");
                     exit(-1);
                 } else {
-                    printf("Closing socket\n");
+                    struct timeval current_time;
+                    gettimeofday(&current_time, NULL);
+                    double elapsed = (current_time.tv_sec - start_time.tv_sec) +
+                                    (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+                    printf("[%.6f] Client %d disconnected\n", elapsed, poll_fds[i].fd);
+                    close(poll_fds[i].fd);
+                    poll_fds[i].fd = -1;
                 }
             }
         }
 
-        // New connection
         if ((poll_fds[0].revents & POLLIN) || (poll_fds[0].revents & POLLPRI)) {
             if ((cl = accept(fd, NULL, NULL)) == -1) {
                 perror("accept error");
@@ -89,33 +89,53 @@ int main() {
 
             if (addConnection(poll_fds, cl) == -1) {
                 perror("Failed to add new connection");
+            } else {
+                struct timeval current_time;
+                gettimeofday(&current_time, NULL);
+                double elapsed = (current_time.tv_sec - start_time.tv_sec) +
+                                (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+                printf("[%.6f] New client connected: fd=%d\n", elapsed, cl);
             }
         }
 
-        // Socket events
         for (int i = 1; i < POLL_LENGTH; i++) {
             if (poll_fds[i].fd < 0) continue;
             int cur_desc = poll_fds[i].fd;
 
             if ((poll_fds[i].revents & POLLIN) || (poll_fds[i].revents & POLLPRI)) {
                 if ((rc = read(cur_desc, buf, sizeof(buf))) > 0) {
+                    struct timeval current_time;
+                    gettimeofday(&current_time, NULL);
+                    double elapsed = (current_time.tv_sec - start_time.tv_sec) +
+                                    (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
+                    // время, дескриптор клиента и данные
+                    printf("[%.6f] Client %d: ", elapsed, cur_desc);
                     for (int j = 0; j < rc; j++) {
                         buf[j] = toupper(buf[j]);
                         printf("%c", buf[j]);
                     }
+                    printf("\n");
+                    fflush(stdout);
                 }
 
                 if (rc == -1) {
                     perror("read");
                     exit(-1);
                 } else if (rc == 0) {
-                    printf("EOF reached, closing connection\n");
+                    struct timeval current_time;
+                    gettimeofday(&current_time, NULL);
+                    double elapsed = (current_time.tv_sec - start_time.tv_sec) +
+                                    (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+                    printf("\n[%.6f] Client %d disconnected (EOF)\n", elapsed, cur_desc);
                     close(cur_desc);
                     poll_fds[i].fd = -1;
                 }
             }
         }
     }
+
+    return 0;
 }
 
 int addConnection(struct pollfd *poll_list, int fd) {
@@ -123,10 +143,8 @@ int addConnection(struct pollfd *poll_list, int fd) {
 
     for (int i = 1; i < POLL_LENGTH; i++) {
         if (poll_list[i].fd < 0) {
-            result = 1;
             poll_list[i].fd = fd;
             poll_list[i].events = POLLIN | POLLPRI;
-
             result = 0;
             break;
         }

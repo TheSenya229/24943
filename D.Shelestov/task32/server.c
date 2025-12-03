@@ -7,10 +7,12 @@
 #include <ctype.h>
 #include <aio.h>
 #include <signal.h>
+#include <sys/time.h> 
 
 #define BUFFER_SIZE (100)
 
 char *socket_path = "./socket32";
+struct timeval start_time;
 
 struct aiocb *create_request(int socket) {
     struct aiocb *request = calloc(1, sizeof(struct aiocb));
@@ -21,7 +23,6 @@ struct aiocb *create_request(int socket) {
 
     request->aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     request->aio_sigevent.sigev_signo = SIGIO;
-    // Will be forwarded to the signal handler
     request->aio_sigevent.sigev_value.sival_ptr = request;
 
     return request;
@@ -37,27 +38,42 @@ void event_handler(int sig, siginfo_t *info, void *context) {
 
         if (size == 0) {
             // EOF
-            printf("EOF reached, closing connection\n");
+            struct timeval current_time;
+            gettimeofday(&current_time, NULL);
+            double elapsed = (current_time.tv_sec - start_time.tv_sec) + 
+                            (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+            printf("\n[%.6f] Client %d disconnected (EOF)\n", elapsed, request->aio_fildes);
+            
             close(request->aio_fildes);
-
             free(buffer);
             free(request);
-
             return;
         }
 
+        // время, дескриптор клиента и данные
+        struct timeval current_time;
+        gettimeofday(&current_time, NULL);
+        double elapsed = (current_time.tv_sec - start_time.tv_sec) + 
+                        (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+        
+        printf("[%.6f] Client %d: ", elapsed, request->aio_fildes);
         for (int i = 0; i < size; i++) {
             int c = toupper(buffer[i]);
             printf("%c", c);
         }
+	printf("\n");
+        fflush(stdout);
 
-        // Schedule next read
+        // следующее чтение
         aio_read(request);
     }
 }
 
 int main() {
     int fd, cl;
+    
+    // отсчет времени
+    gettimeofday(&start_time, NULL);
 
     if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("socket error");
@@ -81,18 +97,26 @@ int main() {
         exit(-1);
     }
 
-    // Set the signal handler
+    // обработчик сигнала
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_sigaction = event_handler;
     action.sa_flags = SA_SIGINFO | SA_RESTART;
     sigaction(SIGIO, &action, NULL);
 
+    printf("Async server started. Waiting for connections...\n");
+
     while (1) {
         if ((cl = accept(fd, NULL, NULL)) == -1) {
-            perror("accept error");
+//            perror("accept error");
             continue;
         }
+
+        struct timeval current_time;
+        gettimeofday(&current_time, NULL);
+        double elapsed = (current_time.tv_sec - start_time.tv_sec) + 
+                        (current_time.tv_usec - start_time.tv_usec) / 1000000.0;
+        printf("[%.6f] New client connected: fd=%d\n", elapsed, cl);
 
         struct aiocb *request = create_request(cl);
         if (aio_read(request) == -1) {
@@ -100,4 +124,6 @@ int main() {
             exit(-1);
         }
     }
+    
+    return 0;
 }
