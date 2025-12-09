@@ -10,15 +10,14 @@
 #include <aio.h>
 #include <fcntl.h>
 
-#define SOCKET_PATH "./socket"
-#define BUF         1024
-#define MAX_CLIENTS 5
-#define MAX_OUT     200000
+#define SOCK_PATH "socket_path"
+#define MAX_CLIENTS 32
+#define MAX_OUT 200000
 
 struct client {
     int fd;
     struct aiocb aio;
-    char buf[BUF];
+    char buf[1024];
     int id;
     int msg_count;
 };
@@ -45,15 +44,16 @@ int main(void)
         clients[i].id = 0;
         clients[i].msg_count = 0;
     }
+
     srv = socket(AF_UNIX, SOCK_STREAM, 0);
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strcpy(addr.sun_path, SOCKET_PATH);
-    unlink(SOCKET_PATH);
+    strcpy(addr.sun_path, SOCK_PATH);
+    unlink(SOCK_PATH);
 
     bind(srv, (struct sockaddr *)&addr, sizeof(addr));
-    listen(srv, MAX_CLIENTS);
+    listen(srv, 5);
 
     {
         int flags = fcntl(srv, F_GETFL, 0);
@@ -62,8 +62,6 @@ int main(void)
 
     start = time(NULL);
     gettimeofday(&start_tv, NULL);
-
-    printf("Async server (Task32) started\n");
 
     while (1) {
         if (time(NULL) - start >= 15)
@@ -80,7 +78,7 @@ int main(void)
                     memset(&clients[i].aio, 0, sizeof(struct aiocb));
                     clients[i].aio.aio_fildes = newfd;
                     clients[i].aio.aio_buf = clients[i].buf;
-                    clients[i].aio.aio_nbytes = BUF;
+                    clients[i].aio.aio_nbytes = sizeof(clients[i].buf);
 
                     aio_read(&clients[i].aio);
                     break;
@@ -129,9 +127,7 @@ int main(void)
                         len = snprintf(outbuf + outlen,
                                        MAX_OUT - outlen,
                                        "[%ld.%06ld] %d message from (%d client): ",
-                                       sec, usec,
-                                       clients[i].msg_count,
-                                       cid);
+                                       sec, usec, clients[i].msg_count, cid);
                         if (len > 0) {
                             outlen += len;
                             if (outlen > MAX_OUT)
@@ -151,7 +147,7 @@ int main(void)
                     memset(&clients[i].aio, 0, sizeof(struct aiocb));
                     clients[i].aio.aio_fildes = clients[i].fd;
                     clients[i].aio.aio_buf = clients[i].buf;
-                    clients[i].aio.aio_nbytes = BUF;
+                    clients[i].aio.aio_nbytes = sizeof(clients[i].buf);
                     aio_read(&clients[i].aio);
                 }
             }
@@ -174,6 +170,6 @@ int main(void)
     }
 
     close(srv);
-    unlink(SOCKET_PATH);
+    unlink(SOCK_PATH);
     return 0;
 }
