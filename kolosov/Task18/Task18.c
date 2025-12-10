@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
 
         char tbuf[20];
         struct tm *tm = localtime(&st.st_mtime);
+
         strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M", tm);
 
         char *name = argv[i];
@@ -59,10 +60,7 @@ int main(int argc, char *argv[])
                pw ? pw->pw_name : "?",
                gr ? gr->gr_name : "?");
 
-        if (S_ISREG(st.st_mode))
-            printf("%10lld ", (long long)st.st_size);
-        else
-            printf("          ");
+        printf("%10lld ", (long long)st.st_size);
 
         printf("%s %s\n", tbuf, name);
     }
